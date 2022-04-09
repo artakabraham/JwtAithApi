@@ -1,6 +1,9 @@
-﻿namespace JwtAithApi.IdentityAuth
+﻿using Microsoft.AspNetCore.Identity;
+
+namespace JwtAithApi.IdentityAuth
 {
-    public class ApplicationUser
+    public class ApplicationUser : IdentityUser
     {
+
     }
 }
