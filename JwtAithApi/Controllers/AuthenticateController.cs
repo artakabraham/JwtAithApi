@@ -4,7 +4,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using System;
+using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace JwtAithApi.Controllers
@@ -44,6 +49,41 @@ namespace JwtAithApi.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "User creation failed!" });
             }
             return Ok(new Response { Status = "Success", Message = "User created Successfully!" });
+        }
+
+        [HttpPost]
+        [Route("login")]
+        public async Task<IActionResult> Login([FromBody] LoginModel model)
+        {
+            var user = await _userManager.FindByNameAsync(model.UserName);
+            if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
+            {
+                var userRoles = await _userManager.GetRolesAsync(user);
+
+                var authClamis = new List<Claim>
+                {
+                    new Claim(ClaimTypes.Name, user.UserName),
+                    new Claim(JwtRegisteredClaimNames.Jti,Guid.NewGuid().ToString())
+                };
+
+                foreach (var userRole in userRoles)
+                {
+                    authClamis.Add(new Claim(ClaimTypes.Role, userRole));
+                }
+
+                var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:SecretKey"]));
+
+                var token = new JwtSecurityToken(
+                    issuer: _configuration["JWT:ValidIssuer"],
+                    audience: _configuration["JWT:ValidAudience"],
+                    expires: DateTime.Now.AddHours(3),
+                    claims: authClamis,
+                    signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
+                    );
+
+                return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token), expiration = token.ValidTo });
+            }
+            return Unauthorized();
         }
     }
 }
